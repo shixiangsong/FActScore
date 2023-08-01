@@ -43,9 +43,9 @@ class FactScorer(object):
         self.cost_estimate = cost_estimate
 
         if "llama" in model_name:
-            self.lm = CLM("inst-llama-7B",
-                          model_dir=os.path.join(model_dir, "inst-llama-7B"),
-                          cache_file=os.path.join(cache_dir, "inst-llama-7B.pkl"))
+            self.lm =  CLM("Llama-2-7b-chat-hf",
+                          model_dir=os.path.join(model_dir, "Llama-2-7b-chat-hf"),
+                          cache_file=os.path.join(cache_dir, "llama-2-7b-chat.pkl"))
         elif "ChatGPT" in model_name:
             self.lm = OpenAIModel("ChatGPT",
                                   cache_file=os.path.join(cache_dir, "ChatGPT.pkl"),
@@ -108,7 +108,7 @@ class FactScorer(object):
                   atomic_facts=None,
                   knowledge_source=None,
                   verbose=False):
-
+## 先register一个knowledge
         if knowledge_source is None:
             # use the default one (enwiki-20230401)
             knowledge_source = "enwiki-20230401"
@@ -117,7 +117,7 @@ class FactScorer(object):
         else:
             assert knowledge_source in self.retrieval, \
                 f"{knowledge_source} is not registered yet. Please use `register_knowledge_source()` function to register it with a database"
-
+### WTF.....  TODO: CHECK IT 
         if type(topics)==len(generations)==str:
             topics = [topics]
             generations = [generations]
@@ -129,9 +129,7 @@ class FactScorer(object):
             assert len(topics)==len(atomic_facts), "`topics` and `atomic_facts` should have the same length"
         else:
             if self.af_generator is None:
-                self.af_generator = AtomicFactGenerator(key_path=self.openai_key,
-                                                        demon_dir=os.path.join(self.data_dir, "demos"),
-                                                        gpt3_cache_file=os.path.join(self.cache_dir, "InstructGPT.pkl"))
+                self.af_generator = AtomicFactGenerator("/home/sxsong/llama/llama-2-7b-chat", "demos", os.path)
 
             # estimate the total cost of atomic fact generation
             total_words = 0

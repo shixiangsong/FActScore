@@ -12,18 +12,20 @@ import os
 import time
 from nltk.tokenize import sent_tokenize
 
-from factscore.openai_lm import OpenAIModel
+from factscore.clm import CLM
 
 nltk.download("punkt")
 
 
 class AtomicFactGenerator(object):
-    def __init__(self, key_path, demon_dir, gpt3_cache_file=None):
+    def __init__(self, model_dir = "", demon_dir="demos", cache_dir=""):
         self.nlp = spacy.load("en_core_web_sm")
         self.is_bio = True
         self.demon_path = os.path.join(demon_dir, "demons.json" if self.is_bio else "demons_complex.json")
-
-        self.openai_lm = OpenAIModel("InstructGPT", cache_file=gpt3_cache_file, key_path=key_path)
+        ### 这里尝试是否可以更换
+        self.llama_lm =  CLM("Llama-2-7b-chat-hf",
+                          model_dir=os.path.join(model_dir, "Llama-2-7b-chat-hf"),
+                          cache_file=os.path.join(cache_dir, "llama-2-7b-chat.pkl"))
 
         # get the demos
         with open(self.demon_path, 'r') as f:
@@ -33,7 +35,7 @@ class AtomicFactGenerator(object):
         self.bm25 = BM25Okapi(tokenized_corpus)
 
     def save_cache(self):
-        self.openai_lm.save_cache()
+        self.llama_lm.save_cache()
 
     def run(self, generation, cost_estimate=None):
         """Convert the generation into a set of atomic facts. Return a total words cost if cost_estimate != None."""
@@ -42,15 +44,16 @@ class AtomicFactGenerator(object):
         return self.get_atomic_facts_from_paragraph(paragraphs, cost_estimate=cost_estimate)
 
     def get_atomic_facts_from_paragraph(self, paragraphs, cost_estimate=None):
+        ## 初始化,分割句子
         sentences = []
         para_breaks = []
         for para_idx, paragraph in enumerate(paragraphs):
             if para_idx > 0 :
                 para_breaks.append(len(sentences))
 
-            initials = detect_initials(paragraph)
+            initials = detect_initials(paragraph) ## 不用动
 
-            curr_sentences = sent_tokenize(paragraph)
+            curr_sentences = sent_tokenize(paragraph) ## 不用动
             curr_sentences_2 = sent_tokenize(paragraph)
 
             curr_sentences = fix_sentence_splitter(curr_sentences, initials)
@@ -129,13 +132,13 @@ class AtomicFactGenerator(object):
         if cost_estimate:
             total_words_estimate = 0
             for prompt in prompts:
-                if cost_estimate == "consider_cache" and (prompt.strip() + "_0") in self.openai_lm.cache_dict:
+                if cost_estimate == "consider_cache" and (prompt.strip() + "_0") in self.llama_lm.cache_dict:
                     continue
                 total_words_estimate += len(prompt.split())
             return total_words_estimate
         else:
             for prompt in prompts:
-                output, _ = self.openai_lm.generate(prompt)
+                output, _ = self.llama_lm.generate(prompt)
                 atoms[prompt_to_sent[prompt]] = text_to_sentences(output)
 
             for key, value in demons.items():
@@ -335,7 +338,7 @@ def fix_sentence_splitter(curr_sentences, initials):
 
 
 def main():
-    generator = AtomicFactGenerator("api.key", "demos", gpt3_cache_dir=None)
+    generator = AtomicFactGenerator("/home/sxsong/llama/llama-2-7b-chat", "demos", "")
     atomic_facts, para_breaks = generator.run("Thierry Henry (born 17 August 1977) is a French professional football coach, pundit, and former player. He is considered one of the greatest strikers of all time, and one the greatest players of the Premier League history. He has been named Arsenal F.C's greatest ever player.\n\nHenry made his professional debut with Monaco in 1994 before signing for defending Serie A champions Juventus. However, limited playing time, coupled with disagreements with the club's hierarchy, led to him signing for Premier League club Arsenal for £11 million in 1999.")
 
     print(atomic_facts)
